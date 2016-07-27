@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"github.com/docker/engine-api/client"
 	"github.com/docker/engine-api/types"
@@ -20,6 +21,15 @@ func newSvcExecutor() *svcExecutor {
 	return &svcExecutor{
 		tasksLaunched: 0,
 	}
+}
+
+type Task struct {
+	Cpus          float64 `json:"cpus"`
+	Mem           float64 `json:"mem"`
+	Image         string  `json:"image"`
+	ContainerName string  `json:"containerName"`
+	Port          string  `json:"port"`
+	Sec           int     `json:"sec"`
 }
 
 func (e *svcExecutor) Registered(driver exec.ExecutorDriver, execInfo *mesos.ExecutorInfo, fwinfo *mesos.FrameworkInfo, slaveInfo *mesos.SlaveInfo) {
@@ -54,37 +64,47 @@ func (e *svcExecutor) LaunchTask(driver exec.ExecutorDriver, taskInfo *mesos.Tas
 		panic(err)
 	}
 
-	options := types.ImageListOptions{All: true}
-	images, err := cli.ImageList(context.Background(), options)
-	if err != nil {
-		panic(err)
-	}
-
-	for _, image := range images {
-		log.Println(image.RepoTags)
-	}
+	var task Task
+	json.Unmarshal(taskInfo.Data, &task)
 
 	portMap := make(nat.PortMap)
 	portBinding80 := nat.PortBinding{
 		HostIP:   "0.0.0.0",
-		HostPort: "31887",
+		HostPort: task.Port,
 	}
 	bingArray := []nat.PortBinding{portBinding80}
 	portMap["80/tcp"] = bingArray
 
-	hostConfig := &container.HostConfig{
-		PortBindings: portMap,
+	resources := container.Resources{
+		CPUQuota:  int64(task.Cpus) * 100000,
+		Memory:    int64(task.Mem) * 1024 * 1024,
+		CPUPeriod: 100000,
 	}
 
-	response, err := cli.ContainerCreate(context.Background(), &container.Config{Image: "nginx"}, hostConfig, nil, "hellosuccess")
+	hostConfig := &container.HostConfig{
+		PortBindings: portMap,
+		Resources:    resources,
+	}
+
+	response, err := cli.ContainerCreate(context.Background(), &container.Config{Image: task.Image}, hostConfig, nil, task.ContainerName)
 
 	if err != nil {
 		panic(err)
 	}
 	cli.ContainerStart(context.Background(), response.ID, types.ContainerStartOptions{})
 
+	runStatus = &mesos.TaskStatus{
+		TaskId: taskInfo.GetTaskId(),
+		State:  mesos.TaskState_TASK_RUNNING.Enum(),
+	}
+	_, err = driver.SendStatusUpdate(runStatus)
+	if err != nil {
+		log.Println("Got error", err)
+	}
+
+	cli.ContainerWait(context.Background(), response.ID)
+	cli.ContainerRemove(context.Background(), response.ID, types.ContainerRemoveOptions{})
 	// Finish task
-	log.Println("Finishing task", taskInfo.GetName())
 	finStatus := &mesos.TaskStatus{
 		TaskId: taskInfo.GetTaskId(),
 		State:  mesos.TaskState_TASK_FINISHED.Enum(),

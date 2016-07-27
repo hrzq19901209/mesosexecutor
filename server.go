@@ -93,10 +93,10 @@ func GetDefaultMappings(filePaths []string) []HttpPathMapping {
 func StartHttpServer(address string, filesToServe []HttpPathMapping) {
 	registerDownloadHandlers(filesToServe)
 	registerUploadHandler()
-	go http.ListenAndServe(address, nil)
+	http.ListenAndServe(address, nil)
 }
 
-func ServeExecutorArtifact(address string, port int, filePath string) string {
+func ServeExecutorArtifact(address string, port int, filePath string) {
 	filesToServe := GetDefaultMappings([]string{filePath})
 
 	httpPath := filesToServe[0].HttpPath
@@ -106,7 +106,6 @@ func ServeExecutorArtifact(address string, port int, filePath string) string {
 	log.Infof("Hosting artifact '%s' at '%s'", httpPath, hostURI)
 
 	StartHttpServer(serverURI, filesToServe)
-	return hostURI
 }
 
 const (
@@ -125,6 +124,5 @@ func init() {
 }
 
 func main() {
-	uri := ServeExecutorArtifact(*address, *artifactPort, *executorPath)
-	fmt.Println(uri)
+	ServeExecutorArtifact(*address, *artifactPort, *executorPath)
 }

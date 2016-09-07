@@ -103,7 +103,7 @@ func (e *svcExecutor) LaunchTask(driver exec.ExecutorDriver, taskInfo *mesos.Tas
 	}
 
 	cli.ContainerWait(context.Background(), response.ID)
-	cli.ContainerRemove(context.Background(), response.ID, types.ContainerRemoveOptions{})
+	//cli.ContainerRemove(context.Background(), response.ID, types.ContainerRemoveOptions{})
 	// Finish task
 	finStatus := &mesos.TaskStatus{
 		TaskId: taskInfo.GetTaskId(),

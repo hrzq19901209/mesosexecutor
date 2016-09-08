@@ -26,12 +26,13 @@ func newSvcExecutor() *svcExecutor {
 }
 
 type Task struct {
-	Cpus          float64 `json:"cpus"`
-	Mem           float64 `json:"mem"`
-	Image         string  `json:"image"`
-	ContainerName string  `json:"containerName"`
-	Port          string  `json:"port"`
-	Sec           int     `json:"sec"`
+	Cpus          float64  `json:"cpus"`
+	Mem           float64  `json:"mem"`
+	Image         string   `json:"image"`
+	ContainerName string   `json:"containerName"`
+	Port          string   `json:"port"`
+	Volume        []string `json:"volume"`
+	NetworkMode   string   `json:"networkmode"`
 }
 
 func (e *svcExecutor) Registered(driver exec.ExecutorDriver, execInfo *mesos.ExecutorInfo, fwinfo *mesos.FrameworkInfo, slaveInfo *mesos.SlaveInfo) {
@@ -88,9 +89,9 @@ func runTask(driver exec.ExecutorDriver, taskInfo *mesos.TaskInfo) {
 
 	hostConfig := &container.HostConfig{
 		//PortBindings: portMap,
-		NetworkMode: "host",
+		NetworkMode: container.NetworkMode(task.NetworkMode),
 		Resources:   resources,
-		Binds:       []string{"/var/log/server:/var/log/server"},
+		Binds:       task.Volume,
 	}
 
 	var cmd strslice.StrSlice = []string{"--port=2016"}

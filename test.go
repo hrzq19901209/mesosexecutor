@@ -1,11 +1,19 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
-	"github.com/docker/engine-api/types/strslice"
 )
 
+type Task struct {
+	Volume []string `json:"volume"`
+}
+
 func main() {
-	var cmd strslice.StrSlice = []string{"--port=1314"}
-	fmt.Println(cmd)
+	jsonBody := []byte(`{"volume":["/var/log/server:/var/log/server","/opt/haoran:/opt/haoran"]}`)
+	var task Task
+	json.Unmarshal(jsonBody, &task)
+	for _, v := range task.Volume {
+		fmt.Println(v)
+	}
 }

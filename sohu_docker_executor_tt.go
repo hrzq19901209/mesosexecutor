@@ -33,6 +33,7 @@ type Task struct {
 	Port          string   `json:"port"`
 	Volume        []string `json:"volume"`
 	NetworkMode   string   `json:"networkmode"`
+	Cmd           []string `json:"cmd"`
 }
 
 func (e *svcExecutor) Registered(driver exec.ExecutorDriver, execInfo *mesos.ExecutorInfo, fwinfo *mesos.FrameworkInfo, slaveInfo *mesos.SlaveInfo) {
@@ -67,7 +68,8 @@ func runTask(driver exec.ExecutorDriver, taskInfo *mesos.TaskInfo) {
 	defaultHeaders := map[string]string{"User-Agent": "engine-api-cli-1.0"}
 	cli, err := client.NewClient("unix:///var/run/docker.sock", "v1.12", nil, defaultHeaders)
 	if err != nil {
-		panic(err)
+		log.Println(err)
+		return
 	}
 
 	var task Task
@@ -94,7 +96,7 @@ func runTask(driver exec.ExecutorDriver, taskInfo *mesos.TaskInfo) {
 		Binds:       task.Volume,
 	}
 
-	var cmd strslice.StrSlice = []string{"--port=2016"}
+	var cmd strslice.StrSlice = task.Cmd
 	config := &container.Config{
 		Image: task.Image,
 		Cmd:   cmd,
@@ -103,8 +105,10 @@ func runTask(driver exec.ExecutorDriver, taskInfo *mesos.TaskInfo) {
 	response, err := cli.ContainerCreate(context.Background(), config, hostConfig, nil, task.ContainerName)
 
 	if err != nil {
-		panic(err)
+		log.Println(err)
+		return
 	}
+
 	cli.ContainerStart(context.Background(), response.ID, types.ContainerStartOptions{})
 
 	runStatus = &mesos.TaskStatus{
@@ -114,6 +118,7 @@ func runTask(driver exec.ExecutorDriver, taskInfo *mesos.TaskInfo) {
 	_, err = driver.SendStatusUpdate(runStatus)
 	if err != nil {
 		log.Println("Got error", err)
+		return
 	}
 
 	cli.ContainerWait(context.Background(), response.ID)
